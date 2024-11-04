@@ -4,24 +4,20 @@ String processGetVal(int expander, int pin)
   {
     return createReply(200, digitalRead(pin));
   }
+  #ifdef SPECIAL_PURPOSE_PWM
   else
   {
     return createReply(200, pwm[expander].getPWM(pin));
   }
-}
-
-String processSetIp(int addr0, int addr1, int addr2, int addr3)
-{
-  ip = IPAddress(addr0, addr1, addr2, addr3);
-  saveIpAddress();    
-  return createReply(200);
+  #endif
+  return createReply(404);
 }
 
 bool needReply()
 {
   String message(packetBuffer);  
 
-  Serial.println(message);
+  //Serial.println(message);
 
   int lastSep = 0;  
   int curSep = message.indexOf(separator, lastSep);;
@@ -31,22 +27,26 @@ bool needReply()
   {
     return false;  
   }
+  
   return true;
 }
 
 void processSetVal(int expander, int port, int dutyCycle)
 {
+  #ifdef SPECIAL_PURPOSE_PWM
   if(expander >= 0 && expander < PWM_EXPANDERS_COUNT && port >= 0 && port < PWM_PORTS_PER_EXPANDER)
   {
     setPwm(expander, port, dutyCycle);
   }
-  else if (expander == -1)
+  #endif
+  if (expander == -1) //digital pins (2-9) and analog pins A1-A5 (15-19). A0 is used for analog random seed
   {
     if(dutyCycle == 1 || dutyCycle == 0)
     {
+      pinMode(port, OUTPUT);
       setPinValue(port, dutyCycle); 
-    }    
-  }  
+    } 
+  }
 }
 
 String processMessage()
@@ -54,19 +54,34 @@ String processMessage()
   String message(packetBuffer);  
   
   int lastSep = 0;
-  
+
   int curSep = message.indexOf(separator, lastSep);;
   String msgType = message.substring(lastSep, curSep);
   lastSep = curSep;
+
+  #ifdef SPECIAL_PURPOSE_OPENTHERM
+  if(isOpenthermMessage(msgType))
+  {
+    return handleOpenthermMessage(message);
+  }
+  #endif
+
+  if(msgType.equals("eepromClear"))
+  {
+    clearEEPROM();
+    return createReply(200);
+  }
   
-  if(msgType != "getVal" && msgType != "reset" && msgType != "setIp" && msgType != "getSessionId")
+  if(!msgType.equals("getVal") && !msgType.equals("reset") && !msgType.equals("getSessionId"))
   {
     return createReply(500);
   }
 
   if(msgType == "reset")
   {
+#ifdef SPECIAL_PURPOSE_PWM
     pwmReset();
+#endif
     return createReply(200);
   }
 
@@ -87,19 +102,7 @@ String processMessage()
   {
     return processGetVal(expander, port);
   }
-  else if(msgType == "setIp")
-  {
-    curSep = message.indexOf(separator, lastSep+1);
-    int addr2 = message.substring(lastSep+1, curSep).toInt();
-    lastSep = curSep;
-    
-    curSep = message.indexOf(separator, lastSep+1);
-    int addr3 = message.substring(lastSep+1, curSep).toInt();
-    lastSep = curSep;  
-
-    return processSetIp(expander, port, addr2, addr3);
-  }
-
+  
   return createReply(500);
 }
 
@@ -125,8 +128,8 @@ void processMessageNoReply()
     curSep = message.indexOf(separator, lastSep+1);
     int value = message.substring(lastSep+1, curSep).toInt();
 
-  Serial.print("Setting value: ");
-  Serial.println(value);  
+  //Serial.print("Setting value: ");
+  //Serial.println(value);  
     
     processSetVal(expander, port, value);
   }

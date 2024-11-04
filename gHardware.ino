@@ -30,6 +30,7 @@ void blinkDebugLed(int millis)
   }
 }
 
+#ifdef SPECIAL_PURPOSE_PWM
 void setPwm(int pwmDriver, int pin, int dutyCycle)
 {
     pwm[pwmDriver].setPin(pin, dutyCycle);
@@ -44,4 +45,16 @@ void pwmReset()
       setPwm(i, port, 0);
     }    
   }
+}
+#endif
+
+void generateSessionId()
+{
+#if defined(__AVR__)
+  randomSeed(analogRead(0));
+#elif defined(ARDUINO_ARCH_ESP8266)
+  randomSeed(ESP.getCycleCount());
+#endif  
+
+  sessionId = random(1,2000000);
 }

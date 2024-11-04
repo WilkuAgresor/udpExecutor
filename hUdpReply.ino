@@ -26,3 +26,7 @@ String createSessionReply()
   reply.concat(separator);
   return reply;
 }
+
+#ifdef SPECIAL_PURPOSE_OPENTHERM
+
+#endif
